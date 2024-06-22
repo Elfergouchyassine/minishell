@@ -1,9 +1,9 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.*;
-import java.nio.file.*;
-import java.util.ArrayList;
+import java.io.*;  //Pour les entrée/sortie
+import java.nio.file.*; // Pour les fichiers NIO
+import java.util.ArrayList; // listes dynamiques
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,27 +26,29 @@ public class SimpleShell extends JFrame {
         JScrollPane scrollPane = new JScrollPane(outputArea);
 
         commandField = new JTextField();
+
+        //traitement des inputs de l'utilisateur dans le champs de l'interface
         commandField.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String line = commandField.getText();
-                if (!line.equals("")) {
+                String line = commandField.getText(); //recuperation du texte
+                if (!line.equals("")) { // si le texte est non vide
                     processCommand(line);
-                    commandField.setText("");
+                    commandField.setText(""); // effacement de texte
                 }
             }
         });
 
-        // Ajouter un KeyListener pour les flèches vers le haut et vers le bas
+        // KeyListener pour les fleches vers le haut et vers le bas
         commandField.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                if (e.getKeyCode() == KeyEvent.VK_UP) { //lorque la fleche haut est pressée
                     String previousCommand = ch.get_previous_command();
                     if (previousCommand != null) {
                         commandField.setText(previousCommand);
                     }
-                } else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                } else if (e.getKeyCode() == KeyEvent.VK_DOWN) { //lorque la fleche bas est pressée
                     String nextCommand = ch.get_next_command();
                     if (nextCommand != null) {
                         commandField.setText(nextCommand);
@@ -55,12 +57,13 @@ public class SimpleShell extends JFrame {
             }
         });
 
+        //bouton d'execution des commandes a travers la methode processCommand
         JButton executeButton = new JButton("Execute");
         executeButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String line = commandField.getText();
-                if (!line.equals("")) {
+                if (!line.equals("")) { //non vide
                     processCommand(line);
                     commandField.setText("");
                 }
@@ -77,26 +80,27 @@ public class SimpleShell extends JFrame {
         updatePrompt();
     }
 
+    //dans l'output, le chemin actuel est mentionné pour faire pareille du terminal en linux
     private void updatePrompt() {
         outputArea.append(current_path + "$ ");
     }
 
+    //la methode qui fait executer tout input de l'utilisateur
     private void processCommand(String line) {
         outputArea.append(line + "\n");
-        if (line.equals("exit") || line.equals("quit")) {
-            outputArea.append("Goodbye\n");
+        if (line.equals("exit") || line.equals("quit")) { // si l'utilisateur souhaite de sortir
             System.exit(0);
         }
 
-        ch.add_command(line);
+        ch.add_command(line); //ajouter toute commande dans l'historique des commandes
         ArrayList<String> command_parts = new ArrayList<>();
         String main_operation = prepare_command(line, command_parts);
 
         try {
             if (line.contains("|")) {
-                handlePipelining(line);
+                handlePipelining(line); //methode de pipelining
             } else if (line.contains(">") || line.contains(">>") || line.contains("<")) {
-                handleRedirection(line);
+                handleRedirection(line); //methode de redirection
             } else {
                 executeCommand(line, command_parts, main_operation);
             }
@@ -108,17 +112,17 @@ public class SimpleShell extends JFrame {
     }
 
     private void executeCommand(String line, ArrayList<String> command_parts, String main_operation) throws IOException {
-        if (main_operation.equals("history")) {
+        if (main_operation.equals("history")) { //afficher l'historique des commandes
             outputArea.append(ch.get_history() + "\n");
-        } else if (main_operation.equals("cd")) {
+        } else if (main_operation.equals("cd")) { //implementation de la commande "cd"
             if (command_parts.size() < 4) {
                 outputArea.append("invalid cd command! hint: you need to provide new directory\n");
                 return;
             }
 
-            String new_path = command_parts.get(3).replaceAll("^\"|\"$", "");
-            if (new_path.equals("~") || new_path.equals("$HOME")) {
-                new_path = home_path;
+            String new_path = command_parts.get(3).replaceAll("^\"|\"$", ""); //retirer les guillemets du chemin
+            if (new_path.equals("~") || new_path.equals("$HOME")) { //retour au home user
+                new_path = home_path; //remplacer le chemin courant par le chemin de home
             }
 
             Path p = Paths.get(new_path);
@@ -128,14 +132,16 @@ public class SimpleShell extends JFrame {
             else
                 new_dir = new File(dir, new_path);
 
-            if (!new_dir.exists() || !new_dir.isDirectory()) {
+            if (!new_dir.exists() || !new_dir.isDirectory()) { //si le repertoire n'existe pas ou pas un repertoire
                 outputArea.append("Error: invalid directory requested\n");
             } else {
                 dir = new_dir;
                 current_path = dir.getAbsolutePath();
             }
+            //la commande 'ls'
         } else if (main_operation.equals("ls")) {
             listDirectory(dir);
+            //la commmande 'cat'
         } else if (main_operation.equals("cat")) {
             if (command_parts.size() < 4) {
                 outputArea.append("invalid cat command! hint: you need to provide a file name\n");
@@ -145,16 +151,17 @@ public class SimpleShell extends JFrame {
             String file_name = command_parts.get(3);
             File file = new File(dir, file_name);
 
-            if (!file.exists() || !file.isFile()) {
+            if (!file.exists() || !file.isFile()) { //si le fichier texte n'existe pas ou pas un fichier texte
                 outputArea.append("Error: file does not exist\n");
             } else {
-                BufferedReader reader = new BufferedReader(new FileReader(file));
+                BufferedReader reader = new BufferedReader(new FileReader(file));//pour lire chaque ligne
                 String line_content;
                 while ((line_content = reader.readLine()) != null) {
-                    outputArea.append(line_content + "\n");
+                    outputArea.append(line_content + "\n"); //affichage de texte
                 }
                 reader.close();
             }
+            //commande 'grep'
         } else if (main_operation.equals("grep")) {
             if (command_parts.size() < 5) {
                 outputArea.append("invalid grep command! hint: you need to provide a word and a file name\n");
@@ -175,6 +182,7 @@ public class SimpleShell extends JFrame {
                 }
                 reader.close();
             }
+            //la commande 'touch'
         } else if (main_operation.equals("touch")) {
             if (command_parts.size() < 4) {
                 outputArea.append("invalid touch command! hint: you need to provide a file name\n");
@@ -183,7 +191,7 @@ public class SimpleShell extends JFrame {
 
             String file_name = command_parts.get(3);
             File file = new File(dir, file_name);
-
+            //les tests sur le fichier a créer
             if (file.exists()) {
                 outputArea.append("Error: file already exists\n");
             } else {
@@ -191,6 +199,7 @@ public class SimpleShell extends JFrame {
                 outputArea.append("File " + file_name + " created successfully\n");
             }
         }
+        //commande 'rm'
         else if (main_operation.equals("rm")) {
             if (command_parts.size() < 4) {
                 outputArea.append("invalid rm command! hint: you need to provide a file name\n");
@@ -359,6 +368,7 @@ public class SimpleShell extends JFrame {
         }
     }
 
+    //methode utilisé dans "grep" pour extraire un mot d'une ligne (librairie regex.pattern&matcher)
     private String highlightWord(String line, String word) {
         Pattern pattern = Pattern.compile(Pattern.quote(word), Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(line);
@@ -369,5 +379,8 @@ public class SimpleShell extends JFrame {
         matcher.appendTail(sb);
         return sb.toString();
     }
+
+
+
 
 }
